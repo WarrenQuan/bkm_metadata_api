@@ -1,4 +1,3 @@
-export const maxDuration = 60; 
 const express = require('express');
 const { getOpenAIDescriptionFromImage, getClaudeDescriptionFromImage, getGoogleGeminiDescriptionFromImage } = require('./generate_metadata');
 require('dotenv').config();
