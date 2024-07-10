@@ -1,6 +1,9 @@
 const { OpenAI } = require("openai");
-const axios = require("axios");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { Anthropic } = require("@anthropic-ai/sdk");
+
+const axios = require("axios");
+
 const fs = require("fs");
 const MAX_TOKENS = 250;
 const promptText = `As an art historian and accessibility expert, generate two distinct texts: ALT TEXT and LONG DESCRIPTION. The texts must adhere to accessibility guidelines, ensuring the description is inclusive and provides an equitable digital experience for all users, including those with disabilities.
@@ -10,6 +13,7 @@ SPECIFIC GUIDELINES FOR LONG DESCRIPTION: Long descriptions can be anywhere from
 
 require("dotenv").config();
 
+// https://docs.anthropic.com/en/docs/build-with-claude/vision#before-you-upload
 /**
  * Fetches a detailed description from the Anthropic API using the provided image URL.
  *
@@ -21,9 +25,14 @@ require("dotenv").config();
  */
 async function getClaudeDescriptionFromImage(apiKey, imageUrl, modelVersion) {
   try {
-    const payload = {
+    const anthropic = new Anthropic({
+      apiKey: apiKey,
+    });
+    const msg = await anthropic.messages.create({
       model: modelVersion,
       max_tokens: MAX_TOKENS,
+      temperature: 0.7,
+      system: promptText,
       messages: [
         {
           role: "user",
@@ -31,35 +40,21 @@ async function getClaudeDescriptionFromImage(apiKey, imageUrl, modelVersion) {
             {
               type: "image",
               source: {
-                type: "url",
-                url: imageUrl,
+                type: "base64",
+                media_type: "image/jpeg",
+                data: await downloadImage(imageUrl),
               },
-            },
-            {
-              type: "text",
-              text: prompt,
             },
           ],
         },
       ],
-    };
-
-    const response = await axios.post(
-      "https://api.anthropic.com/v1/messages",
-      payload,
-      {
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-      }
-    );
-
-    return response.data.content[0].text;
+    });
+    console.log(msg);
+    console.log(msg.content[0].text);
+    return parseAltTextAndLongDescription(msg.content[0].text);
   } catch (error) {
     console.error(
-      "Error:",
+      "Error calling Claude API:",
       error.response ? error.response.data : error.message
     );
     throw error;
@@ -85,10 +80,11 @@ async function getGoogleGeminiDescriptionFromImage(
   const model = genAI.getGenerativeModel({ model: modelVersion });
 
   try {
-    const imageData = await downloadImage(imageUrl, "image/jpg");
-    const result = await model.generateContent([
-      promptText, imageData
-    ]);
+    const imageData = {inlineData: {
+      data: await downloadImage(imageUrl),
+      mimeType: "image/jpg"
+    }};
+    const result = await model.generateContent([promptText, imageData]);
     const content = result.response.text();
     console.log(content);
     return parseAltTextAndLongDescription(content);
@@ -155,7 +151,6 @@ async function getOpenAIDescriptionFromImage(apiKey, imageUrl, modelVersion) {
   }
 }
 
-
 /**
  * Parses the content into alt text and long description.
  *
@@ -172,23 +167,19 @@ function parseAltTextAndLongDescription(content) {
 
 /**
  * Downloads an image from a given URL and converts it to base64 format.
- * 
+ *
  * @param {string} imageUrl - The URL of the image to download.
  * @param {string} mimeType - The MIME type of the image.
  * @returns {Object} - An object containing the inline data of the image as base64 and its MIME type.
  * @throws {Error} - Throws an error if the image download fails or returns a non-200 status.
  */
-async function downloadImage(imageUrl, mimeType) {
-  const response = await axios.get(imageUrl, {responseType: 'arraybuffer'});
+async function downloadImage(imageUrl) {
+  const response = await axios.get(imageUrl, { responseType: "arraybuffer" });
   if (response.status !== 200) {
     throw new Error(`Error downloading image: ${response.status}`);
   }
-  return {
-    inlineData: {
-      data: Buffer.from(response.data).toString('base64'),
-      mimeType
-    }
-  };
+  // console.log("got image");
+  return Buffer.from(response.data).toString("base64");
 }
 
 module.exports = {

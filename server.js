@@ -54,7 +54,7 @@ const generateDescription = async (model, req, res) => {
         console.log(model)
         description = await getGoogleGeminiDescriptionFromImage(req.apiKey, req.imageUrl, model);
         break;
-      case 'claude-3-sonnet-20240229':
+      case 'claude-3-5-sonnet-20240620':
         console.log(model)
         description = await getClaudeDescriptionFromImage(req.apiKey, req.imageUrl, model);
         break;
@@ -96,7 +96,7 @@ app.post('/api/generate-description/gemini-1.5-flash', validateRequest, (req, re
  * Route to generate a description using the Claude 3 model.
  */
 app.post('/api/generate-description/claude-3', validateRequest, (req, res) => {
-  generateDescription('claude-3-sonnet-20240229', req, res);
+  generateDescription('claude-3-5-sonnet-20240620', req, res);
 });
 
 
